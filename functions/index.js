@@ -48,11 +48,32 @@ function isPrivateHost(hostname) {
   ].some((p) => p.test(hostname));
 }
 
-function fetchWithTimeout(url, options, ms) {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("FETCH_TIMEOUT")), ms)
-  );
-  return Promise.race([fetch(url, options), timeout]);
+async function fetchWithTimeout(url, options, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+
+    if (response.ok) {
+      const body = await response.buffer();
+      response._bandwidthHeroBody = body;
+    }
+
+    return response;
+  } catch (err) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error("FETCH_TIMEOUT");
+      timeoutError.cause = err;
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 exports.handler = async (e) => {
@@ -103,6 +124,8 @@ exports.handler = async (e) => {
 
   try {
     let upstreamHeaders = {}, body, contentType;
+    const requestStartedAt = Date.now();
+    let upstreamMs = 0;
 
     try {
       const response = await fetchWithTimeout(
@@ -125,13 +148,17 @@ exports.handler = async (e) => {
         },
         8000
       );
+      // fetchWithTimeout buffers successful bodies, so this includes the
+      // upstream response and full image download time.
+      upstreamMs = Date.now() - requestStartedAt;
+      console.log(`[proxy-timing] upstream=${upstreamMs}ms status=${response.status}`);
 
       if (!response.ok) {
         return { statusCode: response.status || 302, headers: CORS_HEADERS, body: "" };
       }
 
       upstreamHeaders = response.headers;
-      body            = await response.buffer();
+      body            = response._bandwidthHeroBody;
       contentType     = response.headers.get("content-type") || "";
 
     } catch (fetchErr) {
@@ -170,15 +197,20 @@ exports.handler = async (e) => {
       };
     }
 
+    const compressionStartedAt = Date.now();
     const { err, output, headers: compressedHeaders } = await compress(
       body, useWebp, grayscale, quality, originalSize, maxWidth
     );
+    const compressionMs = Date.now() - compressionStartedAt;
 
     if (err) {
       console.log("Compression failed:", r);
       throw err;
     }
 
+    console.log(
+      `[proxy-timing] upstream=${upstreamMs}ms compression=${compressionMs}ms input=${originalSize}B output=${output.length}B`
+    );
     console.log(
       `From ${originalSize}, saved: ${((originalSize - output.length) / originalSize * 100).toFixed(1)}%`
     );
@@ -190,6 +222,7 @@ exports.handler = async (e) => {
       headers: {
         ...CORS_HEADERS,
         ...CACHE_HEADERS,
+        "Server-Timing": `upstream;dur=${upstreamMs}, compress;dur=${compressionMs}`,
         "content-encoding": "identity",
         ...upstreamHeaders,
         ...compressedHeaders,
