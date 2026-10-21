@@ -146,7 +146,7 @@ exports.handler = async (e) => {
           },
           redirect: "follow",
         },
-        8000
+        40000
       );
       // fetchWithTimeout buffers successful bodies, so this includes the
       // upstream response and full image download time.
