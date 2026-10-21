@@ -18,7 +18,7 @@ function compress(input, useWebp, grayscale, quality, originalSize, maxWidth) {
   if (useWebp) {
     pipeline = pipeline.webp({
       quality,
-      effort: 2,
+      effort: 0,
     });
   } else {
     pipeline = pipeline.jpeg({
