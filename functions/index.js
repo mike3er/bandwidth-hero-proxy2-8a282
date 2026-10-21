@@ -133,7 +133,12 @@ exports.handler = async (e) => {
   // Accept both param names for compatibility with original and our extension.
   const quality  = parseInt(q || l, 10) || DEFAULT_QUALITY;
 
-  const maxWidth = parseInt(mw, 10) || 0;
+  const parsedMaxWidth = Number.parseInt(mw, 10);
+  const maxWidth =
+    mw === undefined || mw === null || mw === "" ||
+    !Number.isFinite(parsedMaxWidth)
+      ? 1500
+      : parsedMaxWidth;
 
   try {
     let upstreamHeaders = {}, body, contentType;
