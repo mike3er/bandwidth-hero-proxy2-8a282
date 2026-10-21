@@ -209,11 +209,38 @@ exports.handler = async (e) => {
         bytes: body.length,
       }));
 
-      return {
-        statusCode: 415,
-        headers:    CORS_HEADERS,
-        body:       `Upstream returned non-image response (${contentType})`,
+      const detectedMimeTypes = {
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp",
+        gif: "image/gif",
+        avif: "image/avif",
+        tiff: "image/tiff",
+        heif: "image/heif",
       };
+
+      const correctedType =
+        detectedImage &&
+        detectedMimeTypes[detectedImage.format];
+
+      if (!correctedType) {
+        return {
+          statusCode: 415,
+          headers: CORS_HEADERS,
+          body: `Upstream returned non-image or unsupported image response (${contentType})`,
+        };
+      }
+
+      console.log(
+        "[mime-corrected]",
+        JSON.stringify({
+          reportedType: contentType,
+          correctedType,
+          format: detectedImage.format,
+        })
+      );
+
+      contentType = correctedType;
     }
 
     const originalSize = body.length;
@@ -232,6 +259,7 @@ exports.handler = async (e) => {
           ...CACHE_HEADERS,
           "content-encoding": "identity",
           ...upstreamHeaders,
+          "content-type": contentType,
         },
       };
     }
