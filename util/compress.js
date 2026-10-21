@@ -13,13 +13,22 @@ function compress(input, useWebp, grayscale, quality, originalSize, maxWidth) {
     });
   }
 
-  return pipeline
-    .grayscale(grayscale)
-    .toFormat(format, {
+  pipeline = pipeline.grayscale(grayscale);
+
+  if (useWebp) {
+    pipeline = pipeline.webp({
+      quality,
+      effort: 2,
+    });
+  } else {
+    pipeline = pipeline.jpeg({
       quality,
       progressive:   true,
       optimizeScans: true,
-    })
+    });
+  }
+
+  return pipeline
     .toBuffer({ resolveWithObject: true })
     .then(({ data, info }) => ({
       err: null,

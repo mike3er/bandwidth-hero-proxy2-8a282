@@ -4,6 +4,12 @@ const http = require("http");
 const { URL } = require("url");
 const { handler } = require("./functions/index");
 
+const sharp = require("sharp");
+console.log(
+  `[sharp-version] sharp=${sharp.versions.sharp}` +
+  ` libvips=${sharp.versions.vips}`
+);
+
 const PORT = Number(process.env.PORT || 3000);
 const HOST = "0.0.0.0";
 
