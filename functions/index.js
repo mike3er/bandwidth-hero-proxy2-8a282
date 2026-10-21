@@ -187,7 +187,28 @@ exports.handler = async (e) => {
     }
 
     if (contentType && !contentType.startsWith("image/")) {
-      console.log("Non-image content-type:", contentType, "for URL:", r);
+      let detectedImage;
+
+      try {
+        const metadata = await require("sharp")(body).metadata();
+
+        detectedImage = {
+          format: metadata.format || null,
+          width: metadata.width || null,
+          height: metadata.height || null,
+        };
+      } catch (imageErr) {
+        detectedImage = {
+          error: imageErr.message,
+        };
+      }
+
+      console.log("[mime-diagnostic]", JSON.stringify({
+        reportedType: contentType,
+        detectedImage,
+        bytes: body.length,
+      }));
+
       return {
         statusCode: 415,
         headers:    CORS_HEADERS,
