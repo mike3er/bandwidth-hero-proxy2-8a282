@@ -60,6 +60,19 @@ async function fetchWithTimeout(url, options, ms) {
 
     if (response.ok) {
       const body = await response.buffer();
+      const contentLength = response.headers.get("content-length");
+      const expectedBytes = contentLength && /^\d+$/.test(contentLength)
+        ? Number(contentLength)
+        : null;
+
+      console.log("[upstream-body-diagnostic]", JSON.stringify({
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        contentLength,
+        actualBytes: body.length,
+        lengthMatches: expectedBytes === null ? "unknown" : expectedBytes === body.length
+      }));
+
       response._bandwidthHeroBody = body;
     }
 
